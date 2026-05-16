@@ -7,7 +7,7 @@ TARGET_FILE="$TARGET_DIR/hyprland.lua"
 # Create the directory if it doesn't exist
 mkdir -p "$TARGET_DIR"
 
-echo "Generating Hyprland Lua configuration at $TARGET_FILE..."
+echo "Fixing Hyprland Lua configuration"
 
 # Write the file directly using a standard Bash heredoc
 # The quotes around 'EOF' are critical—they tell the script to treat the 
@@ -371,4 +371,4 @@ hl.window_rule({
 })
 EOF
 
-echo "Configuration successfully written to $TARGET_FILE!"
+echo "Configuration successfully fixed"
