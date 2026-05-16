@@ -9,6 +9,8 @@ mkdir -p "$TARGET_DIR"
 
 echo "Fixing Hyprland Lua configuration"
 
+/usr/bin/sudo /usr/bin/hyprland-fixes
+
 # Write the file directly using a standard Bash heredoc
 # The quotes around 'EOF' are critical—they tell the script to treat the 
 # text completely literally and ignore variables like $ and strings like "^$"
