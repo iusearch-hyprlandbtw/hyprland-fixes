@@ -1,0 +1,9 @@
+post_install() {
+    echo "========= HYPRLAND FIXER ========="
+    echo "Hyprland Fixer Installed!"
+    echo "Run 'hyprland-windowrule-and-keybind-fixes' to get your hyprland working."
+    echo "DO NOT RUN WITH SUDO. RUN NORMALLY. THEN, IF ASKED, ENTER THE PASSWORD FOR SUDO."
+    echo "For Advanced Users: This puts a hyprland.lua configuration with path ~/.config/hypr/hyprland.lua."
+    echo "If you decide to install custom dotfiles, please remove this file using the command 'rm -f ~/.config/hypr/hyprland.lua' otherwise your custom configuration might not work"
+    echo "===================================="
+}
